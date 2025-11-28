@@ -1,0 +1,103 @@
+#include <ESP8266WiFi.h>
+#include <espnow.h>
+
+// LED pins
+#define L1 D1
+#define L2 D2
+#define L3 D3
+#define L4 D4
+#define L5 D5
+#define L6 D6
+
+struct JoystickData {
+  int x;
+  int y;
+} data;
+
+void applyAllOff() {
+  digitalWrite(L1, LOW);
+  digitalWrite(L2, LOW);
+  digitalWrite(L3, LOW);
+  digitalWrite(L4, LOW);
+  analogWrite(L5, 0);
+  analogWrite(L6, 0);
+}
+
+void onDataRecv(uint8_t * mac, uint8_t *incomingData, uint8_t len) {
+  memcpy(&data, incomingData, sizeof(data));
+  int x = data.x;
+  int y = data.y;
+
+  // Debug:
+  Serial.printf("RX X=%d  Y=%d\n", x, y);
+
+  // Reset
+  applyAllOff();
+
+  // --- Handle X-high ---
+  if (x > 3500 && (y > 1800 && y < 2200)) {
+    digitalWrite(L1, HIGH);
+    digitalWrite(L4, HIGH);
+    analogWrite(L5, 255);
+    analogWrite(L6, 255);
+  }
+
+  // --- Handle X-low ---
+  if (x < 500 && (y > 1800 && y < 2200)) {
+    digitalWrite(L2, HIGH);
+    digitalWrite(L3, HIGH);
+    analogWrite(L5, 255);
+    analogWrite(L6, 255);
+  }
+
+  // --- Handle Y-high (independent) ---
+  if (y > 3500 && (x > 1700 && x < 2300)) {
+    // note: these will turn on in addition to any X-handles above
+    digitalWrite(L1, HIGH);
+    digitalWrite(L3, HIGH);
+    analogWrite(L5, 100);
+    analogWrite(L6, 100);
+  }
+
+  // --- Handle Y-low (independent) ---
+  if (y < 500 && (x > 1700 && x < 2300)) {
+    digitalWrite(L2, HIGH);
+    digitalWrite(L4, HIGH);
+    analogWrite(L5, 100);
+    analogWrite(L6, 100);
+  }
+
+  // --- Optional explicit "middle" off zones ---
+  if (x > 1200 && x < 2800) {
+    // intentionally do nothing (kept off) or you can override
+  }
+  if (y > 1200 && y < 2800) {
+    // middle Y — keep off
+  }
+}
+
+void setup() {
+  Serial.begin(115200);
+  WiFi.mode(WIFI_STA);
+
+  pinMode(L1, OUTPUT);
+  pinMode(L2, OUTPUT);
+  pinMode(L3, OUTPUT);
+  pinMode(L4, OUTPUT);
+  pinMode(L5, OUTPUT);
+  pinMode(L6, OUTPUT);
+
+  analogWriteRange(255);
+
+  if (esp_now_init() != 0) {
+    Serial.println("ESP-NOW Error!");
+    return;
+  }
+
+  esp_now_set_self_role(ESP_NOW_ROLE_SLAVE);
+  esp_now_register_recv_cb(onDataRecv);
+}
+
+void loop() {
+  // nothing needed here
+}
