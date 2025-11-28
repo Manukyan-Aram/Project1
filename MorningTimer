@@ -1,0 +1,54 @@
+#include <ESP8266WiFi.h>
+#include <NTPClient.h>
+#include <WiFiUdp.h>
+
+const char* ssid     = "Ararat";      // Մուտքագրիր քո WiFi SSID
+const char* password = "artashat";      // Մուտքագրիր քո WiFi գաղտնաբառը
+
+WiFiUDP ntpUDP;
+NTPClient timeClient(ntpUDP, "pool.ntp.org", 4*3600, 60000); // GMT+4 Հայաստան
+
+const int ledPin = D6; // Լեդի միացման պինը
+
+bool ledTriggered = false; // Հաշվի առնելու համար, որ լեդը միացված լինի միայն մեկ անգամ
+
+void setup() {
+  pinMode(ledPin, OUTPUT);
+  digitalWrite(ledPin, LOW);
+  Serial.begin(115200);
+
+  WiFi.begin(ssid, password);
+  Serial.print("Connecting to WiFi");
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("Connected!");
+
+  timeClient.begin();
+}
+
+void loop() {
+  timeClient.update();
+
+  int hours = timeClient.getHours();
+  int minutes = timeClient.getMinutes();
+  int seconds = timeClient.getSeconds();
+
+  Serial.printf("Time: %02d:%02d:%02d\n", hours, minutes, seconds);
+
+  // Երբ ժամն է 15:01 և լեդը դեռ միացված չէ
+  if (hours == 15 && minutes == 10 && !ledTriggered) {
+    digitalWrite(ledPin, HIGH);
+    delay(5000);              // 5 վայրկյան լեդը ON
+    digitalWrite(ledPin, LOW);
+    ledTriggered = true;      // միացումն իրականացվել է
+  }
+
+  // Վերջերս ժամի անցումից հետո վերադնենք՝ հաջորդ օրը նորից աշխատի
+  if (hours != 15 || minutes != 1) {
+    ledTriggered = false;
+  }
+
+  delay(1000); // մեկ վայրկյան ինտերվալ
+}
